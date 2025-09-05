@@ -10,7 +10,7 @@ def grab_films(username):
 
     user = User(username)
     page = user.pages.films
-    first_dom = parse_url(f"{page.url}/page/1/")
+    first_dom = parse_url(f"{page.url}/by/rated-date/page/1/")
 
     movies = extract_movies_from_user_watched(first_dom)
 

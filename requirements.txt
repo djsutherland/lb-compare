@@ -1,3 +1,4 @@
 streamlit
 arrow
+requests
 git+https://github.com/nmcassa/letterboxdpy.git

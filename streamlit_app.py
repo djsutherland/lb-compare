@@ -1,10 +1,12 @@
 from pathlib import Path
 import pickle
+import re
 
 import arrow
 from letterboxdpy.core.scraper import parse_url
 from letterboxdpy.user import User
 from letterboxdpy.pages.user_films import extract_movies_from_user_watched
+import requests
 import streamlit as st
 
 CACHE_DIR: Path = Path(__file__).parent / "cache"
@@ -50,12 +52,31 @@ def grab_films(username: str):
     return movies
 
 
+@st.cache_data
+def get_username(string: str) -> str:
+    if re.match(r"(?:https?://)?boxd.it/[a-zA-Z]+", string):
+        resp = requests.head(string)
+        if not resp.ok or "location" not in resp.headers:
+            st.error("Confused by boxd.it; try just putting in the username itself.")
+        else:
+            string = resp.headers["location"]
+
+    if m := re.match(r"(?:https?://)?letterboxd.com/([^/]+)", string):
+        return m.group(1)
+    elif "/" in string:
+        st.error(f"The username `{string}` seems invalid; put in just the username.")
+        return ""
+    else:
+        return string
+
+
 st.title("🎬 lb-compare")
-st.write("We'll look up movies that ")
-un_from: str = st.text_input("letterboxd username", key="un_from")
-st.write("has watched, and ")
-un_to: str = st.text_input("letterboxd username", key="un_to")
-st.write("hasn't.")
+a, b, c, d, e = st.columns([0.25, 0.2, 0.2, 0.2, 0.1], vertical_alignment="bottom")
+a.write("We'll look up movies that ")
+un_from: str = get_username(b.text_input("letterboxd username", key="un_from"))
+c.write("has watched, and ")
+un_to: str = get_username(d.text_input("letterboxd username", key="un_to"))
+e.write("hasn't.")
 
 m_from = grab_films(un_from) if un_from else None
 m_to = grab_films(un_to) if un_to else None
@@ -66,7 +87,7 @@ if m_from and m_to:
 
     for k, d in sorted(
         cands.items(),
-        key=lambda kd: (kd[1]["rating"] or 0, kd[1]["liked"]),
+        key=lambda kd: ((d := kd[1])["rating"] or 0, d["liked"], -d["year"], d["name"]),
         reverse=True,
     ):
         rating = d["rating"] or 0
@@ -77,4 +98,6 @@ if m_from and m_to:
                 "★" * (rating // 2) + "½" * (rating % 2) + "☆" * ((10 - rating) // 2)
             )
         heart = "❤️" if d["liked"] else "&nbsp;" * 5
-        st.write(f"{stars} {heart} [{d['name']}](https://letterboxd.com/film/{k})")
+        st.write(
+            f"{stars} {heart} [{d['name']}](https://letterboxd.com/film/{k}) ({d['year']})"
+        )

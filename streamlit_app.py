@@ -88,12 +88,13 @@ def get_username(string: str) -> str:
             string = resp.headers["location"]
 
     if m := re.match(r"(?:https?://)?letterboxd.com/([^/]+)", string):
-        return m.group(1).lower()
-    elif "/" in string or "." in string:
+        string = m.group(1)
+        
+    if "/" in string or "." in string:
         st.error(f"The username `{string}` seems invalid; put in just the username.")
         return ""
     else:
-        return string.lower()
+        return string.lower().strip()
 
 
 st.title("🎬 lb-compare")

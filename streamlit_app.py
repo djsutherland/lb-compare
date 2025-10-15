@@ -35,7 +35,7 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
     except InvalidResponseError as e:
         if '"code": 404' in str(e):
             st.error(f"Can't find user {username}; typo?")
-            return None
+            st.stop()
         else:
             raise
 
@@ -83,6 +83,7 @@ def get_username(string: str) -> str:
         resp = requests.head(string)
         if not resp.ok or "location" not in resp.headers:
             st.error("Confused by boxd.it; try just putting in the username itself.")
+            return ""
         else:
             string = resp.headers["location"]
 

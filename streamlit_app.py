@@ -121,7 +121,7 @@ if un_from and un_to:
         key=lambda kd: (
             (d := kd[1])["rating"] or 0,
             d["liked"],
-            int(kd[0] in watchlist_to),
+            -int(kd[0] in watchlist_to),
             -d["year"],
             d["name"],
         ),

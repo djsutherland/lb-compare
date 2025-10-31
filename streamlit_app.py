@@ -122,7 +122,7 @@ if un_from and un_to:
         key=lambda kd: (
             (d := kd[1])["rating"] or 0,
             d["liked"],
-            -d["year"],
+            -(d["year"] or 0),
             d["name"],
         ),
         reverse=True,

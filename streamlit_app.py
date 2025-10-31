@@ -3,7 +3,7 @@ import pickle
 import re
 
 import arrow
-from letterboxdpy.core.exceptions import InvalidResponseError
+from letterboxdpy.core.exceptions import InvalidResponseError, PrivateRouteError
 from letterboxdpy.core.scraper import parse_url
 from letterboxdpy.user import User
 from letterboxdpy.pages.user_films import extract_movies_from_user_watched
@@ -20,12 +20,13 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
     if cache_pth.exists():
         with cache_pth.open("rb") as f:
             d = pickle.load(f)
-        l, r = st.columns([0.2, 0.8])
-        if not l.button("Re-scrape", key=f"reset_{obj_name}_{username}"):
-            r.write(
-                f"Using saved {obj_name} for {username} from {d['loaded_at'].humanize()}."
-            )
-            return d[obj_name]
+        if d['loaded_at'] > arrow.utcnow().shift(days=-7):
+            l, r = st.columns([0.2, 0.8])
+            if not l.button("Re-scrape", key=f"reset_{obj_name}_{username}"):
+                r.write(
+                    f"Using saved {obj_name} for {username} from {d['loaded_at'].humanize()}."
+                )
+                return d[obj_name]
 
     pbar_text = f"Grabbing {obj_name} for {username}"
     pbar = st.progress(0.0, text=pbar_text)
@@ -40,7 +41,12 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
             raise
 
     page = getattr(user.pages, obj_name)
-    first_dom = parse_url(f"{page.url}/page/1/")
+
+    try:
+        first_dom = parse_url(f"{page.url}/page/1/")
+    except PrivateRouteError:
+        pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
+        return {}
 
     results = process_dom(first_dom)
 
@@ -89,7 +95,7 @@ def get_username(string: str) -> str:
 
     if m := re.match(r"(?:https?://)?letterboxd.com/([^/]+)", string):
         string = m.group(1)
-        
+
     if "/" in string or "." in string:
         st.error(f"The username `{string}` seems invalid; put in just the username.")
         return ""

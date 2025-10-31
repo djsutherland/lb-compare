@@ -20,7 +20,7 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
     if cache_pth.exists():
         with cache_pth.open("rb") as f:
             d = pickle.load(f)
-        if d['loaded_at'] > arrow.utcnow().shift(days=-7):
+        if d["loaded_at"] > arrow.utcnow().shift(days=-7):
             l, r = st.columns([0.2, 0.8])
             if not l.button("Re-scrape", key=f"reset_{obj_name}_{username}"):
                 r.write(
@@ -85,7 +85,9 @@ def grab_watchlist(username: str):
 
 @st.cache_data
 def get_username(string: str) -> str:
-    if re.match(r"(?:https?://)?boxd.it/[a-zA-Z]+", string):
+    if "boxd.it" in string:
+        if "://" not in string:
+            string = "https://" + string
         resp = requests.head(string)
         if not resp.ok or "location" not in resp.headers:
             st.error("Confused by boxd.it; try just putting in the username itself.")
@@ -106,15 +108,25 @@ def get_username(string: str) -> str:
 st.title("🎬 lb-compare")
 a, b, c, d, e = st.columns([0.25, 0.2, 0.2, 0.2, 0.1], vertical_alignment="bottom")
 a.write("We'll look up movies that ")
-un_from = get_username(b.text_input("letterboxd username", key="un_from"))
+un_from = get_username(
+    b.text_input(
+        "letterboxd username", key="un_from", value=st.query_params.get("from", "")
+    )
+)
 c.write("has watched, and ")
-un_to = get_username(d.text_input("letterboxd username", key="un_to"))
+un_to = get_username(
+    d.text_input(
+        "letterboxd username", key="un_to", value=st.query_params.get("to", "")
+    )
+)
 e.write("hasn't.")
 
 if un_from and un_to:
     if un_from == un_to:
         st.error(f"{un_from} will have to sort this out on their own.")
         st.stop()
+    st.query_params["from"] = un_from
+    st.query_params["to"] = un_to
 
     m_from = grab_films(un_from)
     m_to = grab_films(un_to)

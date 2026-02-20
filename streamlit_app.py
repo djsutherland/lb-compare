@@ -3,7 +3,11 @@ import pickle
 import re
 
 import arrow
-from letterboxdpy.core.exceptions import InvalidResponseError, PrivateRouteError
+from letterboxdpy.core.exceptions import (
+    AccessDeniedError,
+    InvalidResponseError,
+    PrivateRouteError,
+)
 from letterboxdpy.core.scraper import parse_url
 from letterboxdpy.user import User
 from letterboxdpy.pages.user_films import extract_movies_from_user_watched
@@ -32,37 +36,44 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
     pbar = st.progress(0.0, text=pbar_text)
 
     try:
-        user = User(username)
-    except InvalidResponseError as e:
-        if '"code": 404' in str(e):
-            st.error(f"Can't find user {username}; typo?")
-            st.stop()
-        else:
-            raise
+        try:
+            user = User(username)
+        except InvalidResponseError as e:
+            if '"code": 404' in str(e):
+                st.error(f"Can't find user {username}; typo?")
+                st.stop()
+            else:
+                raise
 
-    page = getattr(user.pages, obj_name)
+        page = getattr(user.pages, obj_name)
 
-    try:
-        first_dom = parse_url(f"{page.url}/page/1/")
-    except PrivateRouteError:
-        pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
-        return {}
+        try:
+            first_dom = parse_url(f"{page.url}/page/1/")
+        except PrivateRouteError:
+            pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
+            return {}
 
-    results = process_dom(first_dom)
+        results = process_dom(first_dom)
 
-    pages = first_dom.find_all(class_="paginate-page")
-    n_pages = int(pages[-1].text) if pages else 1
-    pbar.progress(1 / n_pages, text=pbar_text)
+        pages = first_dom.find_all(class_="paginate-page")
+        n_pages = int(pages[-1].text) if pages else 1
+        pbar.progress(1 / n_pages, text=pbar_text)
 
-    for i in range(2, n_pages + 1):
-        dom = parse_url(f"{page.url}/page/{i}/")
-        results.update(process_dom(dom))
-        pbar.progress(i / n_pages, text=pbar_text)
+        for i in range(2, n_pages + 1):
+            dom = parse_url(f"{page.url}/page/{i}/")
+            results.update(process_dom(dom))
+            pbar.progress(i / n_pages, text=pbar_text)
 
-    res = {"loaded_at": arrow.utcnow(), obj_name: results}
-    with open(cache_pth, "wb") as f:
-        pickle.dump(res, f)
-    return results
+        res = {"loaded_at": arrow.utcnow(), obj_name: results}
+        with open(cache_pth, "wb") as f:
+            pickle.dump(res, f)
+        return results
+    except AccessDeniedError:
+        st.error(
+            "Letterboxd is banning this IP from scraping, sorry. "
+            "Bother Danica to try restarting the app, maybe."
+        )
+        st.stop()
 
 
 def grab_films(username: str):

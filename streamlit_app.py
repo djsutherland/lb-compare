@@ -47,11 +47,23 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
 
         page = getattr(user.pages, obj_name)
 
+        def private_watchlist():
+            pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
+            res = {"loaded_at": arrow.utcnow(), obj_name: {}}
+            with open(cache_pth, "wb") as f:
+                pickle.dump(res, f)
+            return {}
+
         try:
             first_dom = parse_url(f"{page.url}/page/1/")
         except PrivateRouteError:
-            pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
-            return {}
+            return private_watchlist()
+        except AccessDeniedError:
+            # not sure why this is happening but seems like it can
+            if obj_name == "watchlist":
+                return private_watchlist()
+            else:
+                raise
 
         results = process_dom(first_dom)
 

@@ -150,7 +150,9 @@ if un_from and un_to:
             stars = "&nbsp;" * 21
         else:
             stars = (
-                "★" * (rating // 2) + "½" * (rating % 2) + "☆" * ((10 - rating) // 2)
+                "★" * int(rating // 1)
+                + "½" * int(bool(rating % 1))
+                + "☆" * int((5 - rating) // 1)
             )
         heart = "❤️" if d["liked"] else "&nbsp;" * 5
         wlist = "📝" if k in watchlist_to else "&nbsp;" * 5

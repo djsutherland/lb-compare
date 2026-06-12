@@ -1,5 +1,0 @@
-streamlit
-arrow
-requests
-#letterboxdpy ~= 6.4
-git+https://github.com/nmcassa/letterboxdpy.git

@@ -1,0 +1,10 @@
+[project]
+name = "lb-compare"
+version = "0.1.0"
+requires-python = ">=3.10,<4"
+dependencies = [
+  "streamlit",
+  "arrow",
+  "requests",
+  "letterboxdpy>=6.5.7",
+]

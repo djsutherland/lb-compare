@@ -7,5 +7,5 @@ if errorlevel 1 (
   set "PATH=%USERPROFILE%\.local\bin;%USERPROFILE%\.cargo\bin;%PATH%"
 )
 
-uv run streamlit run streamlit_app.py --server.address localhost --browser.gatherUsageStats false
+uv run -U streamlit run streamlit_app.py --server.address localhost --browser.gatherUsageStats false
 pause

@@ -14,7 +14,7 @@ from letterboxdpy.core.exceptions import (
 
 from flaresolverr_transport import DEFAULT_URL, FlareSolverrSession
 
-CHECK_URL = "https://letterboxd.com/"
+CHECK_URL = "https://letterboxd.com/davidehrlich/films/"
 
 
 def main() -> int:

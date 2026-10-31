@@ -6,14 +6,18 @@ import arrow
 from letterboxdpy.core.exceptions import (
     AccessDeniedError,
     InvalidResponseError,
+    PageLoadError,
     PrivateRouteError,
+    ResourceNotFoundError,
 )
 from letterboxdpy.core.scraper import parse_url
-from letterboxdpy.user import User
-from letterboxdpy.pages.user_films import extract_movies_from_user_watched
+from letterboxdpy.pages.user_films import UserFilms, extract_movies_from_user_watched
+from letterboxdpy.pages.user_watchlist import UserWatchlist
 from letterboxdpy.utils.movies_extractor import extract_movies_from_vertical_list
 import requests
 import streamlit as st
+
+from flaresolverr_transport import scraping_session, validate_collection
 
 CACHE_DIR: Path = Path(__file__).parent / "cache"
 
@@ -36,16 +40,7 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
     pbar = st.progress(0.0, text=pbar_text)
 
     try:
-        try:
-            user = User(username)
-        except InvalidResponseError as e:
-            if '"code": 404' in str(e):
-                st.error(f"Can't find user {username}; typo?")
-                st.stop()
-            else:
-                raise
-
-        page = getattr(user.pages, obj_name)
+        page = UserFilms(username) if obj_name == "films" else UserWatchlist(username)
 
         def private_watchlist():
             pbar.progress(1.0, text=f"{username}'s {obj_name} seems to be private")
@@ -56,16 +51,16 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
 
         try:
             first_dom = parse_url(f"{page.url}/page/1/")
+        except ResourceNotFoundError:
+            st.error(f"Can't find user {username}; typo?")
+            st.stop()
         except PrivateRouteError:
-            return private_watchlist()
-        except AccessDeniedError:
-            # not sure why this is happening but seems like it can
             if obj_name == "watchlist":
                 return private_watchlist()
-            else:
-                raise
+            raise
 
         results = process_dom(first_dom)
+        validate_collection(first_dom, results, obj_name)
 
         pages = first_dom.find_all(class_="paginate-page")
         n_pages = int(pages[-1].text) if pages else 1
@@ -73,7 +68,9 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
 
         for i in range(2, n_pages + 1):
             dom = parse_url(f"{page.url}/page/{i}/")
-            results.update(process_dom(dom))
+            page_results = process_dom(dom)
+            validate_collection(dom, page_results, obj_name)
+            results.update(page_results)
             pbar.progress(i / n_pages, text=pbar_text)
 
         res = {"loaded_at": arrow.utcnow(), obj_name: results}
@@ -82,8 +79,7 @@ def _grab(username: str, obj_name: str, process_dom) -> dict:
         return results
     except AccessDeniedError:
         st.error(
-            "Letterboxd is banning this IP from scraping, sorry. "
-            "Bother Danica to try restarting the app, maybe."
+            "Letterboxd blocked this request. Try again later or check the scraping server."
         )
         st.stop()
 
@@ -151,9 +147,19 @@ if un_from and un_to:
     st.query_params["from"] = un_from
     st.query_params["to"] = un_to
 
-    m_from = grab_films(un_from)
-    m_to = grab_films(un_to)
-    watchlist_to = grab_watchlist(un_to)
+    try:
+        with scraping_session():
+            m_from = grab_films(un_from)
+            m_to = grab_films(un_to)
+            watchlist_to = grab_watchlist(un_to)
+    except (
+        PageLoadError,
+        InvalidResponseError,
+        ResourceNotFoundError,
+        PrivateRouteError,
+    ) as exc:
+        st.error(str(exc))
+        st.stop()
 
     cands = {k: v for k, v in m_from.items() if k not in m_to}
     st.write(f"{len(cands):,} candidate movies:")
